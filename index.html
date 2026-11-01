@@ -96,14 +96,22 @@ input,select,textarea{border:0;background:color-mix(in srgb,var(--ac) 7%,var(--s
 <button class="btn fab" id="fab" hidden>+ Заказ</button>
 <nav id="nav" hidden></nav>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
-var FIREBASE_CONFIG=null,LOCAL=false; // вставьте сюда firebaseConfig или подключите базу кнопкой в приложении
+var FIREBASE_CONFIG={
+  apiKey: "AIzaSyAjvGmsPZSJGc0bnlsg9s4mntXuReBQM1E",
+  authDomain: "alliumshop.firebaseapp.com",
+  databaseURL: "https://alliumshop-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "alliumshop",
+  storageBucket: "alliumshop.firebasestorage.app",
+  messagingSenderId: "115056113788",
+  appId: "1:115056113788:web:e228808cb564c9718671f9",
+  measurementId: "G-4E4E1EG9FJ"
+},LOCAL=false;
 var ST=["Новый","Собирается","Готов","В пути","Выдан"],SRC=["Instagram","WhatsApp","2ГИС","Сарафан","Другое"],PAY=["Kaspi","Наличные","Перевод"],
 PLACE=["Актау (город)","Пригород или посёлок","Другой город или село"],RL={admin:"Админ",operator:"Оператор",florist:"Флорист",courier:"Курьер"},
 WHY=["Увяли","Брак при приёмке","Повреждены","Потеряны, недостача","Другое"],CATS=["Цветы","Зелень","Упаковка"];
-var DB,AUTH,U,ME="",ADMIN=false,REAL=false,MODE="admin",VID="",ROLE="",tab="today",lastTab="",per="7",jf="all",started=false,subRole=null,unsubs=[],NAMES={},LS={},PH={},BUSY={},LOGREADY=false;
+var DB,U,ME="",ADMIN=false,REAL=false,MODE="admin",VID="",ROLE="",tab="today",lastTab="",per="7",jf="all",started=false,subRole=null,unsubs=[],NAMES={},LS={},PH={},BUSY={},LOGREADY=false;
 var D={orders:[],stock:[],bq:[],costs:{},log:[],staff:{},sc:[],vis:[],set:{},leads:[]};
 var ER={},PENDLEAD="";
 function fd(x){return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")}
@@ -174,6 +182,14 @@ function openSheet(html){
 // ---- запуск
 function status(t){if(!started)document.getElementById("view").innerHTML='<div class="empty">'+t+'</div>'}
 
+var PH0="ea69d9a3b868cbe1b8d290cedee18cd7e75ca85157a5a22be84e4bb90a273563";
+async function sha(t){var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,"0")}).join("")}
+function passOK(){try{return localStorage.getItem("allium_adm")===PH0}catch(e){return false}}
+function askPass(){return new Promise(function(res){
+  document.getElementById("nav").hidden=true;document.getElementById("fab").hidden=true;
+  document.getElementById("view").innerHTML='<div class="empty"><b>Вход для администратора</b><br>Пароль нужен только в первый раз на этом устройстве.<br><br><input id="pw" type="password" inputmode="numeric" autocomplete="off" placeholder="Пароль"><br><button class="btn" id="pwb">Войти</button><div id="pwe" class="muted"></div></div>';
+  async function go2(){var h=await sha("allium|"+document.getElementById("pw").value.trim());if(h===PH0){try{localStorage.setItem("allium_adm",h)}catch(e){}res()}else document.getElementById("pwe").textContent="Неверный пароль"}
+  document.getElementById("pwb").onclick=go2;document.getElementById("pw").onkeydown=function(e){if(e.key==="Enter")go2()}})}
 function localDB(){
   var KEY="allium_local",store={},ls=[],tm=0;
   try{store=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){store={}}
@@ -199,54 +215,27 @@ function localDB(){
     get:function(){return Promise.resolve(store[p]?mk(p):{exists:false,data:function(){return undefined}})}}}
   return{collection:function(c){return new Q(c)},doc:doc}}
 function openDB(){
-  var cfg=FIREBASE_CONFIG;try{var sv=localStorage.getItem("allium_fb");if(sv)cfg=JSON.parse(sv)}catch(e){}
+  var cfg=FIREBASE_CONFIG;
+  // если в коде уже прописан валидный конфиг — используем его, localStorage игнорируем
+  if(!cfg || !cfg.apiKey){try{var sv=localStorage.getItem("allium_fb");if(sv)cfg=JSON.parse(sv)}catch(e){}}
   if(cfg&&cfg.apiKey&&cfg.projectId){
     if(typeof firebase==="undefined")throw new Error("Не загрузился Firebase. Проверьте интернет и обновите страницу.");
-    if(!firebase.apps.length)firebase.initializeApp(cfg);
-    AUTH=firebase.auth();
-    var d=firebase.firestore();
+    if(!firebase.apps.length)firebase.initializeApp(cfg);var d=firebase.firestore();
     try{d.enablePersistence({synchronizeTabs:true}).catch(function(){})}catch(e){}
     LOCAL=false;return d}
-  LOCAL=true;AUTH=null;return localDB()}
-function loginHtml(){return'<div class="card"><h2 style="margin-top:0">Вход в Allium</h2><p class="muted">Войдите с email и паролем. Роль загрузится из защищённого профиля.</p><label for="le">Email</label><input id="le" type="email" autocomplete="username" inputmode="email" placeholder="admin@example.com"><label for="lp">Пароль</label><input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"><div class="acts"><button class="btn" data-a="login">Войти</button></div><div id="lerr" class="muted" style="margin-top:10px"></div></div>'}
+  LOCAL=true;return localDB()}
+function regHtml(){return'<div class="card"><h2 style="margin-top:0">Добро пожаловать в Allium</h2><p class="muted">Первый раз на этом телефоне. Введите имя и выберите роль, дальше пароль не нужен.</p><label for="rn">Ваше имя</label><input id="rn" autocomplete="name"><label for="rr">Роль</label><select id="rr">'+Object.keys(RL).map(function(k){return'<option value="'+k+'">'+RL[k]+'</option>'}).join("")+'</select><div class="acts"><button class="btn" data-a="reg">Войти</button></div><div class="acts"><button class="btn g s" data-a="adminlogin">Я администратор</button></div></div>'}
 function go(){
   status("Подключаю базу…");
+  ME=lsg("allium_uid","");if(!ME){ME=uid()+uid();try{localStorage.setItem("allium_uid",ME)}catch(e){}}
   try{DB=openDB()}catch(e){status(E(e.message||e));return}
-  if(LOCAL||!AUTH){
-    status("Нужен Firebase. Подключите базу и войдите по email/паролю.");
-    document.getElementById("view").innerHTML=loginHtml()+'<div class="card" style="margin-top:10px"><button class="btn g s" data-a="fbset">Подключить базу Firebase</button></div>';
-    return}
+  REAL=passOK();ADMIN=REAL;
   var t=setTimeout(function(){status("База не отвечает больше 10 секунд. Проверьте интернет и обновите страницу.")},10000);
-  AUTH.onAuthStateChanged(function(user){
-    clearTimeout(t);
-    if(!user){
-      ME="";ROLE="";ADMIN=false;REAL=false;started=true;
-      document.getElementById("nav").hidden=true;document.getElementById("fab").hidden=true;
-      document.getElementById("view").innerHTML=loginHtml();
-      return}
-    ME=user.uid;
-    DB.collection("staff").onSnapshot(function(s){
-      started=true;D.staff={};s.docs.forEach(function(d){D.staff[d.id]=d.data()});
-      var prof=D.staff[ME];
-      if(prof&&prof.role){
-        ROLE=prof.role;
-        REAL=(ROLE==="admin");
-        ADMIN=REAL&&(MODE==="admin");
-        if(REAL)ROLE=MODE;
-        names();chk();render();
-      }else{
-        ROLE="";ADMIN=false;REAL=false;
-        document.getElementById("nav").hidden=true;document.getElementById("fab").hidden=true;
-        document.getElementById("view").innerHTML='<div class="empty"><b>Нет профиля или доступа</b><br>Аккаунт '+E(user.email||ME)+' авторизован, но роль не загружена.<br>Проверьте документ staff/'+E(ME)+' с полем role и Rules.<br><br><button class="btn g s" data-a="logout">Выйти</button></div>';
-      }
-    },function(err){
-      started=true;
-      var code=(err&&err.code)||"";
-      document.getElementById("nav").hidden=true;document.getElementById("fab").hidden=true;
-      document.getElementById("view").innerHTML='<div class="empty"><b>Нет доступа к профилю</b><br>'+E(code||err.message||"ошибка")+'<br><br>Аккаунт авторизован ('+E(user.email||"")+').<br>Пока Rules = deny all — это ожидаемо.<br>После настройки Rules обновите страницу.<br><br><button class="btn g s" data-a="logout">Выйти</button></div>';
-    });
-  },function(err){clearTimeout(t);status("Ошибка Auth: "+E((err&&err.message)||err))});
-}
+  DB.collection("staff").onSnapshot(function(s){
+    started=true;clearTimeout(t);D.staff={};s.docs.forEach(function(d){D.staff[d.id]=d.data()});
+    if(REAL){ROLE=MODE;ADMIN=MODE==="admin"}else ROLE=(D.staff[ME]&&D.staff[ME].role)||"";
+    names();chk();render()},
+    function(err){clearTimeout(t);status("Не удалось прочитать данные: "+E((err&&(err.code||err.message))||"ошибка"))})}
 function names(){Object.keys(D.staff).forEach(function(i){NAMES[i]=D.staff[i].name||NAMES[i]||""});if(REAL)NAMES[ME]=NAMES[ME]||"Админ"}
 function chk(){var k=ROLE+"|"+ADMIN+"|"+VID;if(k!==subRole){subRole=k;resub()}}
 function cid(){return REAL?(VID||ME):ME}
@@ -697,9 +686,9 @@ function pcOf(id){if(PCI.ref!==D.log){PCI.ref=D.log;PCI.m={};D.log.forEach(funct
 function leadsCard(){var l=D.leads.filter(function(x){return x.st==="new"});
   return'<div class="row"><h2>Входящие (WhatsApp, Instagram)</h2><button class="btn s" data-a="leadadd">+ Обращение</button></div>'+(l.length?l.slice(0,10).map(function(x){var ph=String(x.phone||"").replace(/\D/g,"");return'<div class="card"><div class="row"><b>'+E(x.name||"Без имени")+'</b><span class="tag">'+E(x.src)+'</span></div><div class="muted">'+E(x.text||"")+'</div><div class="acts"><button class="btn s" data-a="lead2o" data-id="'+x.id+'">В заказ</button>'+(ph?'<a class="btn s g" target="_blank" rel="noopener" href="https://wa.me/'+ph+'">Ответить</a>':"")+'<button class="btn s g" data-a="leadx" data-id="'+x.id+'">Закрыть</button></div></div>'}).join(""):'<div class="card muted">Новых обращений нет. Пришло сообщение в WhatsApp или Instagram? Нажмите «+ Обращение» и вставьте текст.</div>')}
 function vTeam(){
-  var ids=Object.keys(D.staff),h='<h2>Команда</h2><p class="muted">Сотрудники с аккаунтами Firebase. Роль задаётся только здесь (из защищённого профиля).</p>';
-  h+=ids.length?ids.map(function(i){return'<div class="card"><div class="row"><b>'+E(nm(i))+'</b><select data-a="role" data-id="'+i+'" style="width:auto">'+Object.keys(RL).map(function(r){return'<option value="'+r+'"'+(D.staff[i].role===r?" selected":"")+'>'+RL[r]+'</option>'}).join("")+'</select></div><div class="acts"><button class="btn s g" data-a="rmstaff" data-id="'+i+'">Убрать из команды</button></div></div>'}).join(""):'<div class="card muted">Команда пока пуста. Аккаунты сотрудников создаёт администратор в Firebase Authentication, затем добавляет профиль staff/{uid}.</div>';
-  return h+setCard()+'<p class="muted">Создайте пользователя в Firebase Console → Authentication → Users. Затем добавьте документ staff/{uid} с полями name и role. Здесь можно менять роль или убрать запись.</p><div class="acts"><button class="btn g s" data-a="logout">Выйти</button></div>'
+  var ids=Object.keys(D.staff),h='<h2>Команда</h2><p class="muted">Сотрудники, которые вошли на сайт, появляются здесь.</p>';
+  h+=ids.length?ids.map(function(i){return'<div class="card"><div class="row"><b>'+E(nm(i))+'</b><select data-a="role" data-id="'+i+'" style="width:auto">'+Object.keys(RL).map(function(r){return'<option value="'+r+'"'+(D.staff[i].role===r?" selected":"")+'>'+RL[r]+'</option>'}).join("")+'</select></div><div class="acts"><button class="btn s g" data-a="rmstaff" data-id="'+i+'">Убрать из команды</button></div></div>'}).join(""):'<div class="card muted">Команда пока пуста.</div>';
+  return h+setCard()+'<p class="muted">Сотрудники добавляются сами: открывают сайт, вводят имя и выбирают роль. Здесь вы меняете роль или убираете человека.</p><div class="acts"><button class="btn g s" data-a="logout">Выйти из админа на этом телефоне</button></div>'
 }
 function vCourier(){
   var mine=D.orders.filter(function(o){return o.dv&&o.courier===cid()}),act=mine.filter(function(o){return o.st<4}).sort(function(a,b){return(a.date+a.time).localeCompare(b.date+b.time)}),dn=mine.filter(function(o){return o.st===4}).sort(function(a,b){return(b.dtAt||0)-(a.dtAt||0)});
@@ -727,7 +716,7 @@ function doRender(){
   if(dte.textContent!==dtx)dte.textContent=dtx;
   if(!started)return;
   modeBar();
-  if(!ROLE){nav.hidden=fab.hidden=true;put(v,"v",loginHtml());return}
+  if(!ROLE){nav.hidden=fab.hidden=true;put(v,"v",regHtml());return}
   if(ROLE==="courier"){nav.hidden=fab.hidden=true;put(v,"v",vCourier());return}
   var T=[["today","Сегодня"],["orders","Заказы"],["show","Витрина"],["stock","Склад"],["bq","Букеты"]];if(ADMIN)T.push(["stats","Цифры"],["jr","Журнал"],["team","Команда"]);
   if(!T.some(function(t){return t[0]===tab}))tab="today";
@@ -778,27 +767,9 @@ document.addEventListener("click",function(e){
   else if(a==="leadadd")ask("Новое обращение",[{id:"src",l:"Откуда",t:"sel",o:["WhatsApp","Instagram","Другое"]},{id:"name",l:"Имя",v:""},{id:"phone",l:"Телефон (если есть)",t:"tel",v:""},{id:"text",l:"Что написал клиент",t:"ta",v:""}],function(v){if(!v.name.trim()&&!v.phone.trim()&&!v.text.trim()){toast("Заполните хотя бы одно поле");return false}return setDoc("leads/"+uid(),{src:v.src,name:v.name.trim(),phone:v.phone.trim(),text:v.text.trim(),st:"new",ts:Date.now(),by:ME})},"Сохранить");
   else if(a==="lead2o"){var ld=D.leads.filter(function(x){return x.id===id})[0];if(ld){PENDLEAD=id;orderForm(null,{phone:ld.phone||"+7",client:ld.name,src:ld.src,note:ld.text})}}
   else if(a==="leadx")upd("leads/"+id,{st:"closed"});
-  else if(a==="login"){
-    var email=(document.getElementById("le").value||"").trim(),pass=(document.getElementById("lp").value||"");
-    var errEl=document.getElementById("lerr");if(errEl)errEl.textContent="";
-    if(!email||!pass){if(errEl)errEl.textContent="Введите email и пароль";return}
-    if(!AUTH){toast("Firebase Auth не инициализирован");return}
-    var btn=document.querySelector('[data-a="login"]');if(btn)btn.disabled=true;
-    AUTH.signInWithEmailAndPassword(email,pass).then(function(){}).catch(function(e){
-      var msg="Ошибка входа";
-      if(e&&e.code==="auth/invalid-email")msg="Некорректный email";
-      else if(e&&e.code==="auth/user-not-found")msg="Аккаунт не найден";
-      else if(e&&(e.code==="auth/wrong-password"||e.code==="auth/invalid-credential"))msg="Неверный пароль";
-      else if(e&&e.code==="auth/too-many-requests")msg="Слишком много попыток. Подождите";
-      else if(e&&e.message)msg=e.message;
-      if(errEl)errEl.textContent=msg;else toast(msg);
-      if(btn)btn.disabled=false;
-    });
-  }
-  else if(a==="logout"){
-    if(AUTH)AUTH.signOut().then(function(){ME="";ROLE="";ADMIN=false;REAL=false;location.reload()}).catch(function(){location.reload()});
-    else location.reload();
-  }
+  else if(a==="reg"){var rn=(document.getElementById("rn").value||"").trim();if(!rn){toast("Введите имя");return}setDoc("staff/"+ME,{role:document.getElementById("rr").value,name:rn})}
+  else if(a==="adminlogin")askPass().then(function(){location.reload()});
+  else if(a==="logout"&&ADMIN){try{localStorage.removeItem("allium_adm")}catch(x){}location.reload()}
   else if(a==="fbset")ask("Подключение базы Firebase",[{id:"cfg",l:"Firebase Console → создать проект → Firestore Database (режим теста) → Настройки проекта → Web-приложение → скопируйте firebaseConfig и вставьте сюда",t:"ta",v:""}],function(v){var o={};v.cfg.replace(/["']?(\w+)["']?\s*:\s*["']([^"']*)["']/g,function(m,k,x){o[k]=x});if(!o.apiKey||!o.projectId){toast("Не нашёл apiKey и projectId. Вставьте весь firebaseConfig.");return false}try{localStorage.setItem("allium_fb",JSON.stringify(o))}catch(x){}location.reload();return false},"Подключить");
   else if(a==="in"&&s)inForm(s);
   else if(a==="out"&&s)outForm(s);
